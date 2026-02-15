@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Notifications</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  await UI.mountLayout("notifications");
+  UI.setTitle("Notifications", "Upcoming showings and system alerts");
+
+  const c = UI.qs("#content");
+  c.innerHTML = `<div class="card"><h3>Notifications</h3><div class="muted">Loading...</div></div>`;
+
+  async function load() {
+    const r = await UI.api("/api/notifications", { method:"GET" });
+    const items = r.items || [];
+    c.innerHTML = `
+      <div class="card">
+        <h3>Inbox</h3>
+        ${items.map(n => `
+          <div class="row" style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,.08); align-items:flex-start;">
+            <div style="flex:1;">
+              <div style="font-weight:900;">${n.title}</div>
+              <div class="muted" style="margin-top:6px;">${n.message}</div>
+              <div class="muted" style="margin-top:6px; font-size:12px;">${n.at} • Severity: ${n.severity}</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              ${n.isRead ? `<span class="pill">Read</span>` : `<button class="btn ghost" data-read="${n.id}">Mark read</button>`}
+            </div>
+          </div>
+        `).join("") || `<div class="muted">No notifications.</div>`}
+      </div>
+    `;
+
+    UI.qsa("[data-read]").forEach(b => {
+      b.addEventListener("click", async () => {
+        const id = b.dataset.read;
+        await UI.api(`/api/notifications/${encodeURIComponent(id)}/read`, { method:"PUT", body:"{}" });
+        UI.toast("Marked read");
+        load();
+      });
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

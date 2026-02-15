@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Property</title>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<body>
+    <script src="/js/ui.js"></script>
+    <script>
+        (async () => {
+            await UI.mountLayout("properties");
+            UI.setTitle("Property page", "Listing style layout + CRM data (owner, sources, leads, showings)");
+
+
+            const c = UI.qs("#content");
+
+            const id = new URLSearchParams(location.search).get("id");
+            if (!id) {
+                c.innerHTML = `<div class="muted">Missing property id</div>`;
+                return;
+            }
+
+            c.innerHTML = `<div class="muted">Loading...</div>`;
+
+
+            const r = await UI.api(`/api/properties/${encodeURIComponent(id)}`, { method: "GET" });
+
+            if (!r || !r.item) {
+                c.innerHTML = `<div class="card">Property not found</div>`;
+                return;
+            }
+
+            const p = r.item;
+            const owner = r.owner;
+            const leads = r.leads || [];
+            const showings = r.showings || [];
+
+
+            const imgs = p.images || [];
+            const cover = imgs.find(x => x.isCover) || imgs[0] || null;
+            const thumbs = imgs.slice(0, 4);
+
+            const facts = [
+                ["Bedrooms", p.bedrooms ?? "—"],
+                ["Bathrooms", p.bathrooms ?? "—"],
+                ["Area", p.area ? `${p.area} m²` : "—"],
+                ["Floor", p.floor || "—"],
+                ["Type", p.type || "—"],
+                ["Condition", p.condition || "—"],
+                ["Status", p.status || "—"],
+            ];
+
+            c.innerHTML = `
+    <div class="row gap">
+      <div>
+        <div style="font-size:18px; font-weight:900;">${p.title || "Untitled property"}</div>
+        <div class="muted" style="margin-top:6px;">${p.address || ""}</div>
+        <div class="muted" style="margin-top:4px; font-size:12px;">ID: <span style="font-weight:800;">${p.id}</span></div>
+      </div>
+      <div style="text-align:right;">
+        <div class="muted">Price</div>
+        <div style="font-size:22px; font-weight:900;">${UI.fmtMoney(p.price)}</div>
+        <div style="margin-top:10px; display:flex; justify-content:flex-end; gap:10px;">
+          <a class="btn ghost" href="/property-edit.html?id=${encodeURIComponent(p.id)}"><span class="ic">${UI.icon("edit")}</span><span>Edit</span></a>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="gallery">
+      <div class="mainimg">
+        ${cover ? `<img src="${cover.url}" alt="">` : `<div style="padding:18px;" class="muted">No images yet. Upload images in Edit page.</div>`}
+      </div>
+      <div class="thumbs">
+        ${thumbs.map(t => `<div class="thumb"><img src="${t.url}" alt=""></div>`).join("") || `
+          <div class="thumb"></div><div class="thumb"></div><div class="thumb"></div><div class="thumb"></div>
+        `}
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="grid cols-3">
+      ${facts.map(f => `
+        <div class="card">
+          <h3>${f[0]}</h3>
+          <div style="font-weight:900; font-size:16px;">${f[1]}</div>
+        </div>
+      `).join("")}
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Description</h3>
+        <div style="white-space:pre-wrap; line-height:1.6;">${(p.description || "—")}</div>
+      </div>
+
+      <div class="card">
+        <h3>Owner</h3>
+        ${owner ? `
+          <div style="line-height:1.7;">
+            <div><span class="muted">Name:</span> <strong>${owner.name}</strong></div>
+            <div><span class="muted">Phone:</span> ${owner.phone || "—"}</div>
+            <div><span class="muted">Email:</span> ${owner.email || "—"}</div>
+            <div><span class="muted">Notes:</span> ${owner.notes || "—"}</div>
+          </div>
+        ` : `<div class="muted">No owner linked.</div>`}
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="row">
+          <h3 style="margin:0;">Sources / URLs</h3>
+          <span class="muted"><span class="ic" style="display:inline-flex; vertical-align:middle;">${UI.icon("link")}</span></span>
+        </div>
+        <div style="margin-top:10px;">
+          ${(p.sources || []).map(s => `
+            <div class="row" style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,.08);">
+              <div>
+                <div style="font-weight:800;">${s.label || "Source"}</div>
+                <div class="muted" style="font-size:12px;">${s.type || "listing"}</div>
+              </div>
+              <a class="btn ghost" target="_blank" rel="noreferrer" href="${s.url}">Open</a>
+            </div>
+          `).join("") || `<div class="muted">No sources added.</div>`}
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Activity</h3>
+        <div class="muted" style="line-height:1.7;">
+          <div><span class="muted">Created:</span> ${p.createdAt}</div>
+          <div><span class="muted">Updated:</span> ${p.updatedAt}</div>
+          <div><span class="muted">Showings:</span> ${showings.length}</div>
+          <div><span class="muted">Leads linked:</span> ${leads.length}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Interested leads</h3>
+        <table class="table">
+          <thead><tr><th>Name</th><th>Status</th><th>Phone</th><th style="text-align:right;">Action</th></tr></thead>
+          <tbody>
+            ${leads.map(l => `
+              <tr>
+                <td>${l.name}</td>
+                <td><span class="pill">${l.status}</span></td>
+                <td class="muted">${l.phone || "—"}</td>
+                <td style="text-align:right;"><a class="btn ghost" href="/lead-view.html?id=${encodeURIComponent(l.id)}">Open</a></td>
+              </tr>
+            `).join("") || `<tr><td colspan="4" class="muted">No leads linked to this property.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Showings</h3>
+        <table class="table">
+          <thead><tr><th>When</th><th>Status</th><th>Lead</th></tr></thead>
+          <tbody>
+            ${showings.map(s => {
+                const lead = leads.find(x => x.id === s.leadId);
+                return `
+                <tr>
+                  <td>${s.at}</td>
+                  <td><span class="pill">${s.status}</span></td>
+                  <td class="muted">${lead?.name || s.leadId}</td>
+                </tr>
+              `;
+            }).join("") || `<tr><td colspan="3" class="muted">No scheduled showings.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+        })();
+    </script>
+</body>
+
+</html>

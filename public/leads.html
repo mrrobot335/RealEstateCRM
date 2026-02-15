@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Leads</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  await UI.mountLayout("leads");
+  UI.setTitle("Leads", "Filter leads, open details, schedule showings");
+
+  const c = UI.qs("#content");
+  c.innerHTML = `
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Add lead</h3>
+        <div class="form">
+          <div><div class="label">Name</div><input id="name" class="input"></div>
+          <div class="two">
+            <div><div class="label">Phone</div><input id="phone" class="input"></div>
+            <div><div class="label">Email</div><input id="email" class="input"></div>
+          </div>
+          <div class="two">
+            <div><div class="label">Source</div><input id="source" class="input" placeholder="Call, Website, MyHome, ss"></div>
+            <div>
+              <div class="label">Status</div>
+              <select id="status">
+                <option>New</option>
+                <option>Contacted</option>
+                <option>Qualified</option>
+                <option>Showing Scheduled</option>
+                <option>Client</option>
+                <option>Closed</option>
+              </select>
+            </div>
+          </div>
+          <div class="two">
+            <div><div class="label">Budget</div><input id="budget" class="input" placeholder="120000"></div>
+            <div><div class="label">Property ID (optional)</div><input id="propertyId" class="input" placeholder="p_xxx"></div>
+          </div>
+          <div><div class="label">Notes</div><input id="notes" class="input"></div>
+          <button id="save" class="btn full">Save lead</button>
+          <div id="err" class="muted"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Leads list</h3>
+        <div class="three">
+          <div><div class="label">Search</div><input id="q" class="input" placeholder="Name / phone / email"></div>
+          <div>
+            <div class="label">Status</div>
+            <select id="fStatus">
+              <option value="">Any</option>
+              <option>New</option><option>Contacted</option><option>Qualified</option>
+              <option>Showing Scheduled</option><option>Client</option><option>Closed</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button id="refresh" class="btn full">Apply</button>
+          </div>
+        </div>
+
+        <div style="height:12px;"></div>
+        <table class="table" id="tbl"></table>
+      </div>
+    </div>
+  `;
+
+  async function load() {
+    const qs = new URLSearchParams();
+    const q = UI.qs("#q").value.trim();
+    const status = UI.qs("#fStatus").value;
+    if (q) qs.set("q", q);
+    if (status) qs.set("status", status);
+    const r = await UI.api("/api/leads" + (qs.toString()?`?${qs}`:""), { method:"GET" });
+    const items = r.items || [];
+
+    UI.qs("#tbl").innerHTML = `
+      <thead><tr><th>Name</th><th>Status</th><th>Phone</th><th style="text-align:right;">Action</th></tr></thead>
+      <tbody>
+        ${items.map(l => `
+          <tr>
+            <td style="font-weight:800;">${l.name}</td>
+            <td><span class="pill">${l.status}</span></td>
+            <td class="muted">${l.phone||"—"}</td>
+            <td style="text-align:right;">
+              <a class="btn ghost" href="/lead-view.html?id=${encodeURIComponent(l.id)}">Open</a>
+            </td>
+          </tr>
+        `).join("") || `<tr><td colspan="4" class="muted">No leads found.</td></tr>`}
+      </tbody>
+    `;
+  }
+
+  UI.qs("#refresh").addEventListener("click", load);
+
+  UI.qs("#save").addEventListener("click", async () => {
+    UI.qs("#err").textContent = "";
+    try {
+      await UI.api("/api/leads", {
+        method:"POST",
+        body: JSON.stringify({
+          name: UI.qs("#name").value,
+          phone: UI.qs("#phone").value,
+          email: UI.qs("#email").value,
+          source: UI.qs("#source").value,
+          status: UI.qs("#status").value,
+          budget: UI.qs("#budget").value,
+          propertyId: UI.qs("#propertyId").value,
+          notes: UI.qs("#notes").value
+        })
+      });
+      UI.toast("Lead saved");
+      ["name","phone","email","source","budget","propertyId","notes"].forEach(id => UI.qs("#"+id).value="");
+      UI.qs("#status").value="New";
+      load();
+    } catch(e) {
+      UI.qs("#err").textContent = e.message;
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

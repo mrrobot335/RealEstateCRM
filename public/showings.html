@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Showings</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  await UI.mountLayout("showings");
+  UI.setTitle("Showings", "All scheduled appointments in one place");
+
+  const c = UI.qs("#content");
+  c.innerHTML = `
+    <div class="card">
+      <h3>Schedule</h3>
+      <table class="table" id="tbl"></table>
+    </div>
+  `;
+
+  const r = await UI.api("/api/showings", { method:"GET" });
+  const items = r.items || [];
+  UI.qs("#tbl").innerHTML = `
+    <thead><tr><th>When</th><th>Status</th><th>Property</th><th>Lead</th></tr></thead>
+    <tbody>
+      ${items.map(s => `
+        <tr>
+          <td>${s.at}</td>
+          <td><span class="pill">${s.status}</span></td>
+          <td class="muted">${s.propertyId}</td>
+          <td class="muted">${s.leadId}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="4" class="muted">No showings scheduled.</td></tr>`}
+    </tbody>
+  `;
+})();
+</script>
+</body>
+</html>

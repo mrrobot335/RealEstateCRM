@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Users</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  const me = await UI.mountLayout("users");
+  UI.setTitle("Users", "Managers and agents (RBAC)");
+
+  const c = UI.qs("#content");
+  c.innerHTML = `
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Create user</h3>
+        <div class="muted" style="margin-bottom:10px;">Only managers can create users.</div>
+        <div class="form">
+          <div><div class="label">Name</div><input id="name" class="input"></div>
+          <div><div class="label">Email</div><input id="email" class="input"></div>
+          <div class="two">
+            <div>
+              <div class="label">Role</div>
+              <select id="role">
+                <option>agent</option>
+                <option>manager</option>
+              </select>
+            </div>
+            <div>
+              <div class="label">Password</div>
+              <input id="password" class="input" placeholder="Strong password">
+            </div>
+          </div>
+          <button id="create" class="btn full">Create</button>
+          <div id="err" class="muted"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Users list</h3>
+        <table class="table" id="tbl"></table>
+      </div>
+    </div>
+  `;
+
+  async function load() {
+    const r = await UI.api("/api/users", { method:"GET" });
+    const items = r.items || [];
+    UI.qs("#tbl").innerHTML = `
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th></tr></thead>
+      <tbody>
+        ${items.map(u => `
+          <tr>
+            <td style="font-weight:800;">${u.name}</td>
+            <td class="muted">${u.email}</td>
+            <td><span class="pill">${u.role}</span></td>
+            <td class="muted">${u.isActive ? "Yes" : "No"}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    `;
+  }
+
+  UI.qs("#create").addEventListener("click", async () => {
+    UI.qs("#err").textContent = "";
+    try {
+      await UI.api("/api/users", {
+        method:"POST",
+        body: JSON.stringify({
+          name: UI.qs("#name").value,
+          email: UI.qs("#email").value,
+          role: UI.qs("#role").value,
+          password: UI.qs("#password").value
+        })
+      });
+      UI.toast("User created");
+      UI.qs("#name").value = "";
+      UI.qs("#email").value = "";
+      UI.qs("#password").value = "";
+      load();
+    } catch(e) {
+      UI.qs("#err").textContent = e.message;
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

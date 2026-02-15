@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Import Leads</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  await UI.mountLayout("import");
+  UI.setTitle("Import leads", "Upload CSV or XLSX and add leads instantly");
+
+  const c = UI.qs("#content");
+  c.innerHTML = `
+    <div class="card">
+      <h3>Upload file</h3>
+      <div class="muted" style="margin-bottom:10px;">Supported: .csv, .xlsx. First sheet is used for XLSX.</div>
+      <input id="file" type="file" class="input" accept=".csv,.xlsx,.xls">
+      <button id="btn" class="btn" style="margin-top:10px;"><span class="ic">${UI.icon("upload")}</span><span>Import</span></button>
+      <div id="out" class="muted" style="margin-top:12px;"></div>
+    </div>
+  `;
+
+  UI.qs("#btn").addEventListener("click", async () => {
+    const f = UI.qs("#file").files?.[0];
+    if (!f) return UI.toast("Select a file first");
+    const fd = new FormData();
+    fd.append("file", f);
+
+    try {
+      const r = await UI.apiRaw("/api/leads/import", { method:"POST", body: fd });
+      UI.qs("#out").textContent = `Imported: ${r.added} leads`;
+      UI.toast("Import completed");
+    } catch(e) {
+      UI.qs("#out").textContent = e.message;
+    }
+  });
+})();
+</script>
+</body>
+</html>

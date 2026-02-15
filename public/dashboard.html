@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Dashboard · Real Estate CRM</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<script src="/js/ui.js"></script>
+
+<script>
+(async () => {
+  // Mount sidebar + topbar layout
+  await UI.mountLayout("dashboard");
+
+  // Page title
+  UI.setTitle(
+    "Dashboard",
+    "Overview, insights, and performance snapshot"
+  );
+
+  const content = UI.qs("#content");
+
+  content.innerHTML = `
+    <!-- METRICS -->
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Total Properties</h3>
+        <div class="big" id="mProps">0</div>
+      </div>
+
+      <div class="card">
+        <h3>Total Leads</h3>
+        <div class="big" id="mLeads">0</div>
+      </div>
+
+      <div class="card">
+        <h3>Unread Notifications</h3>
+        <div class="big" id="mNotifs">0</div>
+      </div>
+    </div>
+
+    <div style="height:16px;"></div>
+
+    <!-- LOWER GRID -->
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Agent leaderboard</h3>
+        <table class="table" id="tblAgents"></table>
+      </div>
+
+      <div class="card">
+        <h3>AI insights</h3>
+        <div id="insights" class="muted" style="line-height:1.6;"></div>
+      </div>
+    </div>
+  `;
+
+  // Load analytics
+  const data = await UI.api("/api/analytics", { method: "GET" });
+
+  // Metrics
+  UI.qs("#mProps").textContent = data.metrics.propertiesTotal ?? 0;
+  UI.qs("#mLeads").textContent = data.metrics.leadsTotal ?? 0;
+  UI.qs("#mNotifs").textContent = data.metrics.unreadNotifications ?? 0;
+
+  // Agent leaderboard
+  const agents = data.agentLeaderboard || [];
+  const rows = agents.map(a => `
+    <tr>
+      <td>${a.name}</td>
+      <td style="text-align:right;">
+        <span class="pill">${a.count}</span>
+      </td>
+    </tr>
+  `).join("");
+
+  UI.qs("#tblAgents").innerHTML = `
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th style="text-align:right;">Properties</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || `<tr><td colspan="2" class="muted">No data yet</td></tr>`}
+    </tbody>
+  `;
+
+  // Insights
+  const insights = data.insights || [];
+  UI.qs("#insights").innerHTML = insights.length
+    ? `
+      <ul style="margin:0; padding-left:18px;">
+        ${insights.map(i => `<li>${i}</li>`).join("")}
+      </ul>
+    `
+    : `<div class="muted">No insights yet. Add properties and leads to generate recommendations.</div>`;
+})();
+</script>
+
+</body>
+</html>

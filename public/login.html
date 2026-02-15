@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>CRM Login</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div style="min-height:100vh; display:grid; place-items:center; padding:18px;">
+    <div class="card" style="width:min(420px, 96vw);">
+      <div class="row" style="align-items:flex-start;">
+        <div>
+          <div style="font-weight:900; font-size:18px;">Real Estate CRM</div>
+          <div class="muted" style="margin-top:6px; font-size:13px;">Sign in to continue</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;" class="form">
+        <div>
+          <div class="label">Email</div>
+          <input id="email" class="input" placeholder="manager@crm.local">
+        </div>
+        <div>
+          <div class="label">Password</div>
+          <input id="password" type="password" class="input" placeholder="••••••••">
+        </div>
+        <button id="btn" type="button" class="btn full">Sign in</button>
+        <div id="err" class="muted" style="min-height:18px;"></div>
+
+        <div class="muted" style="margin-top:10px; font-size:12px;">
+          Demo accounts:
+          <div style="margin-top:6px;">
+            manager@crm.local / Manager123!<br/>
+            agent@crm.local / Agent123!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+document.getElementById("btn").onclick = async () => {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+
+  const data = await res.json();
+
+  if (data.ok) {
+    window.location.href = "/dashboard.html";
+  } else {
+    alert("Invalid credentials");
+  }
+};
+</script>
+
+</body>
+</html>

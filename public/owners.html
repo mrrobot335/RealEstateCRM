@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Owners</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  await UI.mountLayout("owners");
+  UI.setTitle("Owners", "Internal owner contacts linked to properties");
+
+  const c = UI.qs("#content");
+  c.innerHTML = `
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Add owner</h3>
+        <div class="form">
+          <div><div class="label">Name</div><input id="name" class="input"></div>
+          <div class="two">
+            <div><div class="label">Phone</div><input id="phone" class="input"></div>
+            <div><div class="label">Email</div><input id="email" class="input"></div>
+          </div>
+          <div><div class="label">Notes</div><input id="notes" class="input" placeholder="Preferred contact time..."></div>
+          <button id="save" class="btn full">Save owner</button>
+          <div id="err" class="muted"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Owners list</h3>
+        <div class="two">
+          <div><div class="label">Search</div><input id="q" class="input" placeholder="Name or phone"></div>
+          <div style="display:flex; align-items:flex-end;">
+            <button id="refresh" class="btn full">Refresh</button>
+          </div>
+        </div>
+        <div style="height:12px;"></div>
+        <table class="table" id="tbl"></table>
+      </div>
+    </div>
+  `;
+
+  async function load() {
+    const q = UI.qs("#q").value.trim();
+    const r = await UI.api("/api/owners" + (q ? `?q=${encodeURIComponent(q)}` : ""), { method:"GET" });
+    const items = r.items || [];
+    UI.qs("#tbl").innerHTML = `
+      <thead><tr><th>Name</th><th>Phone</th><th>Email</th></tr></thead>
+      <tbody>
+        ${items.map(o => `
+          <tr><td style="font-weight:800;">${o.name}</td><td class="muted">${o.phone||"—"}</td><td class="muted">${o.email||"—"}</td></tr>
+        `).join("") || `<tr><td colspan="3" class="muted">No owners saved.</td></tr>`}
+      </tbody>
+    `;
+  }
+
+  UI.qs("#refresh").addEventListener("click", load);
+
+  UI.qs("#save").addEventListener("click", async () => {
+    UI.qs("#err").textContent = "";
+    try {
+      await UI.api("/api/owners", {
+        method:"POST",
+        body: JSON.stringify({
+          name: UI.qs("#name").value,
+          phone: UI.qs("#phone").value,
+          email: UI.qs("#email").value,
+          notes: UI.qs("#notes").value,
+        })
+      });
+      UI.toast("Owner saved");
+      UI.qs("#name").value = "";
+      UI.qs("#phone").value = "";
+      UI.qs("#email").value = "";
+      UI.qs("#notes").value = "";
+      load();
+    } catch(e) {
+      UI.qs("#err").textContent = e.message;
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

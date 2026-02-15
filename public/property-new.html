@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New Property · Real Estate CRM</title>
+    <link rel="stylesheet" href="/css/app.css">
+
+    <style>
+        .img-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .img-item {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            overflow: hidden;
+            background: rgba(16, 31, 56, .45);
+            cursor: grab;
+            position: relative;
+        }
+
+        .img-item.dragging {
+            opacity: .5;
+        }
+
+        .img-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .img-badge {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, .65);
+            border: 1px solid rgba(255, 255, 255, .15);
+        }
+    </style>
+</head>
+
+<body>
+    <script src="/js/ui.js"></script>
+
+    <script>
+        (async () => {
+            const me = await UI.mountLayout("properties");
+            UI.setTitle("New property", "Create listing, upload images, assign agent");
+
+            const c = UI.qs("#content");
+
+            /* ---------------- HTML ---------------- */
+            c.innerHTML = `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div style="font-weight:900;">Create property</div>
+          <div class="muted" style="margin-top:6px;">
+            Drag images to reorder. First image becomes cover.
+          </div>
+        </div>
+        <a class="btn ghost" href="/properties.html">Back</a>
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="card">
+      <div class="form">
+
+        <div class="two">
+          <div>
+            <div class="label">Title</div>
+            <input id="title" class="input" placeholder="Modern apartment in Saburtalo">
+          </div>
+          <div>
+            <div class="label">Price</div>
+            <input id="price" class="input" placeholder="120000">
+          </div>
+        </div>
+
+        <div class="two">
+          <div><div class="label">Address</div><input id="address" class="input" placeholder="Street, building"></div>
+          <div><div class="label">City</div><input id="city" class="input" placeholder="Tbilisi"></div>
+        </div>
+
+        <div class="three">
+          <div>
+            <div class="label">Type</div>
+            <select id="type" class="input">
+              <option>Apartment</option>
+              <option>House</option>
+              <option>Commercial</option>
+              <option>Land</option>
+            </select>
+          </div>
+          <div>
+            <div class="label">Status</div>
+            <select id="status" class="input">
+              <option>Active</option>
+              <option>Under Offer</option>
+              <option>Sold</option>
+              <option>Rented</option>
+              <option>Inactive</option>
+            </select>
+          </div>
+          <div id="agentWrap">
+            <div class="label">Assigned Agent</div>
+            <select id="assignedAgentId" class="input">
+              <option value="">Loading agents…</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="three">
+          <input id="bedrooms" class="input" placeholder="Bedrooms (2)">
+          <input id="bathrooms" class="input" placeholder="Bathrooms (1)">
+          <input id="area" class="input" placeholder="Area m² (75)">
+        </div>
+
+        <div class="two">
+          <input id="floor" class="input" placeholder="Floor (5 / 9)">
+          <input id="condition" class="input" placeholder="Condition (Renovated)">
+        </div>
+
+        <textarea id="description" class="input" placeholder="Clear property description"></textarea>
+
+        <div>
+          <div class="label">Property Images</div>
+          <input id="imageInput" type="file" class="input" multiple accept="image/*">
+          <div id="imgGrid" class="img-grid"></div>
+        </div>
+
+        <div class="card" style="padding:12px;">
+          <div style="font-weight:900;margin-bottom:8px;">Owner Contact</div>
+          <div class="two">
+            <input id="ownerName" class="input" placeholder="Owner full name">
+            <input id="ownerPhone" class="input" placeholder="Owner phone">
+          </div>
+          <div class="two">
+            <input id="ownerEmail" class="input" placeholder="Owner email">
+            <input id="ownerNotes" class="input" placeholder="Notes (optional)">
+          </div>
+        </div>
+
+        <button id="save" type="button" class="btn full">Create property</button>
+        <div id="err" class="muted"></div>
+
+      </div>
+    </div>
+  `;
+
+            /* ------------ AGENTS ------------ */
+            if (me.role === "agent") {
+                UI.qs("#agentWrap").style.display = "none";
+            } else {
+                const res = await UI.api("/api/users");
+                UI.qs("#assignedAgentId").innerHTML =
+                    `<option value="">Select agent</option>` +
+                    res.items
+                        .filter(u => u.role === "agent" || u.role === "manager")
+                        .map(u => `<option value="${u.id}">${u.name}</option>`)
+                        .join("");
+            }
+
+            /* ------------ IMAGES ------------ */
+            const imageInput = UI.qs("#imageInput");
+            const imgGrid = UI.qs("#imgGrid");
+            let images = [];
+            let uid = 0;
+
+            imageInput.addEventListener("change", () => {
+                for (const file of imageInput.files) {
+                    images.push({ id: "img_" + (++uid), file });
+                }
+                imageInput.value = "";
+                renderImages();
+            });
+
+            function renderImages() {
+                imgGrid.innerHTML = "";
+                images.forEach((img, idx) => {
+                    const el = document.createElement("div");
+                    el.className = "img-item";
+                    el.draggable = true;
+                    el.dataset.id = img.id;
+                    el.innerHTML = `
+        <img src="${URL.createObjectURL(img.file)}">
+        ${idx === 0 ? `<div class="img-badge">Cover</div>` : ""}
+      `;
+                    imgGrid.appendChild(el);
+                });
+                enableDrag();
+            }
+
+            function enableDrag() {
+                let dragId = null;
+                imgGrid.querySelectorAll(".img-item").forEach(el => {
+                    el.addEventListener("dragstart", () => {
+                        dragId = el.dataset.id;
+                        el.classList.add("dragging");
+                    });
+                    el.addEventListener("dragend", () => {
+                        dragId = null;
+                        el.classList.remove("dragging");
+                    });
+                    el.addEventListener("dragover", e => e.preventDefault());
+                    el.addEventListener("drop", e => {
+                        e.preventDefault();
+                        const target = el.dataset.id;
+                        if (dragId === target) return;
+                        const from = images.findIndex(x => x.id === dragId);
+                        const to = images.findIndex(x => x.id === target);
+                        const [moved] = images.splice(from, 1);
+                        images.splice(to, 0, moved);
+                        renderImages();
+                    });
+                });
+            }
+
+            /* ------------ SAVE ------------ */
+            /* ------------ SAVE ------------ */
+            UI.qs("#save").addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                UI.qs("#err").textContent = "";
+
+                try {
+                    const fd = new FormData();
+
+                    fd.append("title", title.value);
+                    fd.append("price", price.value);
+                    fd.append("address", address.value);
+                    fd.append("city", city.value);
+                    fd.append("type", type.value);
+                    fd.append("status", status.value);
+                    fd.append("bedrooms", bedrooms.value);
+                    fd.append("bathrooms", bathrooms.value);
+                    fd.append("area", area.value);
+                    fd.append("floor", floor.value);
+                    fd.append("condition", condition.value);
+                    fd.append("description", description.value);
+                    fd.append("ownerName", ownerName.value);
+                    fd.append("ownerPhone", ownerPhone.value);
+                    fd.append("ownerEmail", ownerEmail.value);
+                    fd.append("ownerNotes", ownerNotes.value);
+
+                    if (me.role !== "agent" && assignedAgentId.value) {
+                        fd.append("assignedAgentId", assignedAgentId.value);
+                    }
+
+                    // images in ORDER (first = cover)
+                    images.forEach(img => {
+                        fd.append("images", img.file);
+                    });
+
+                    const resp = await fetch("/api/properties", {
+                        method: "POST",
+                        body: fd
+                    });
+
+                    const r = await resp.json();
+
+                    if (!resp.ok || !r.ok || !r.item?.id) {
+                        throw new Error("Property not saved");
+                    }
+
+                    UI.toast("Property created");
+                    location.href = `/property-view.html?id=${encodeURIComponent(r.item.id)}`;
+
+                } catch (e) {
+                    UI.qs("#err").textContent = e.message || "Failed to create property";
+                }
+            });
+
+
+
+        })();
+    </script>
+</body>
+
+</html>

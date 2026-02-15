@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Properties</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <style>
+        .row-hover:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .pill.green {
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, .25);
+        }
+
+        table.table td {
+            vertical-align: middle;
+        }
+    </style>
+
+</head>
+
+<body>
+    <script src="/js/ui.js"></script>
+    <script>
+        (async () => {
+            await UI.mountLayout("properties");
+            UI.setTitle("Properties", "Filter, open property page, manage images and sources");
+
+            const c = UI.qs("#content");
+            c.innerHTML = `
+    <div class="hero">
+      <div>
+        <div class="title">Property inventory</div>
+        <div class="desc">Use filters to find listings quickly. Open a property to see full page layout.</div>
+      </div>
+      <a class="btn" href="/property-new.html"><span class="ic">${UI.icon("plus")}</span><span>New property</span></a>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="card">
+      <div class="form">
+        <div class="three">
+          <div>
+            <div class="label">Search</div>
+            <input id="q" class="input" placeholder="Title, address, ID">
+          </div>
+          <div>
+            <div class="label">Status</div>
+            <select id="status">
+              <option value="">Any</option>
+              <option>Active</option>
+              <option>Under Offer</option>
+              <option>Sold</option>
+              <option>Rented</option>
+              <option>Inactive</option>
+            </select>
+          </div>
+          <div>
+            <div class="label">Type</div>
+            <select id="type">
+              <option value="">Any</option>
+              <option>Apartment</option>
+              <option>House</option>
+              <option>Commercial</option>
+              <option>Land</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="three">
+          <div>
+            <div class="label">Min price</div>
+            <input id="minPrice" class="input" placeholder="0">
+          </div>
+          <div>
+            <div class="label">Max price</div>
+            <input id="maxPrice" class="input" placeholder="999999">
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:10px;">
+            <button id="btnApply" class="btn" style="flex:1;">Apply</button>
+            <button id="btnReset" class="btn ghost" style="flex:1;">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <div class="card">
+      <h3>Results</h3>
+      <table class="table" id="tbl"></table>
+    </div>
+  `;
+
+            async function load() {
+                const q = UI.qs("#q").value.trim();
+                const status = UI.qs("#status").value;
+                const type = UI.qs("#type").value;
+                const minPrice = UI.qs("#minPrice").value.trim();
+                const maxPrice = UI.qs("#maxPrice").value.trim();
+                const qs = new URLSearchParams();
+                if (q) qs.set("q", q);
+                if (status) qs.set("status", status);
+                if (type) qs.set("type", type);
+                if (minPrice) qs.set("minPrice", minPrice);
+                if (maxPrice) qs.set("maxPrice", maxPrice);
+
+                const r = await UI.api("/api/properties");
+                const items = r.items || [];
+
+                const rows = items.map(p => {
+                    const cover =
+                        (p.images || []).find(i => i.isCover) ||
+                        (p.images || [])[0] ||
+                        null;
+
+                    const coverUrl = cover?.url || null;
+
+                    return `
+<tr class="row-hover">
+  <td style="width:90px;">
+    ${coverUrl
+                            ? `<img src="${coverUrl}"
+            style="
+              width:80px;
+              height:60px;
+              object-fit:cover;
+              border-radius:12px;
+              border:1px solid rgba(255,255,255,.12);
+            ">`
+                            : `<div class="muted" style="width:80px;height:60px;display:flex;align-items:center;justify-content:center;">—</div>`
+                        }
+  </td>
+
+  <td>
+    <div style="font-weight:900;font-size:15px;">
+      ${p.title || "Untitled property"}
+    </div>
+    <div class="muted" style="margin-top:4px;font-size:13px;">
+      ${p.address || ""}
+    </div>
+  </td>
+
+  <td>
+    <span class="pill ${p.status === "Active" ? "green" : ""}">
+      ${p.status}
+    </span>
+  </td>
+
+  <td class="muted">
+    ${p.type}
+  </td>
+
+  <td style="text-align:right;">
+    <div style="font-weight:900;font-size:15px;">
+      ${UI.fmtMoney(p.price)}
+    </div>
+  </td>
+
+  <td style="text-align:right;">
+    <a class="btn ghost"
+       href="/property-view.html?id=${encodeURIComponent(p.id)}">
+       Open
+    </a>
+  </td>
+</tr>
+`;
+                }).join("");
+
+
+
+                UI.qs("#tbl").innerHTML = `
+      <thead>
+        <tr>
+          <th></th><th>Property</th><th>Status</th><th>Type</th><th style="text-align:right;">Price</th><th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="6" class="muted">No properties found.</td></tr>`}
+      </tbody>
+    `;
+            }
+
+            UI.qs("#btnApply").addEventListener("click", load);
+            UI.qs("#btnReset").addEventListener("click", () => {
+                UI.qs("#q").value = "";
+                UI.qs("#status").value = "";
+                UI.qs("#type").value = "";
+                UI.qs("#minPrice").value = "";
+                UI.qs("#maxPrice").value = "";
+                load();
+            });
+
+            load();
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Edit Property</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<script src="/js/ui.js"></script>
+<script>
+(async () => {
+  await UI.mountLayout("properties");
+  UI.setTitle("Edit property", "Upload images, set cover, manage sources and owner link");
+
+  const id = new URLSearchParams(location.search).get("id");
+  const c = UI.qs("#content");
+
+  const r = await UI.api(`/api/properties/${encodeURIComponent(id)}`, { method:"GET" });
+  const p = r.item;
+  const owner = r.owner;
+
+  const ownersList = (await UI.api("/api/owners", { method:"GET" })).items || [];
+
+  function render() {
+    const imgs = p.images || [];
+    c.innerHTML = `
+      <div class="row gap">
+        <div>
+          <div style="font-weight:900; font-size:18px;">Edit: ${p.title}</div>
+          <div class="muted" style="margin-top:6px;">ID: ${p.id}</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <a class="btn ghost" href="/property-view.html?id=${encodeURIComponent(p.id)}">Back to page</a>
+          <a class="btn ghost" href="/properties.html">All properties</a>
+        </div>
+      </div>
+
+      <div style="height:14px;"></div>
+
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>Details</h3>
+          <div class="form">
+            <div class="two">
+              <div><div class="label">Title</div><input id="title" class="input" value="${p.title||""}"></div>
+              <div><div class="label">Price</div><input id="price" class="input" value="${p.price||0}"></div>
+            </div>
+            <div class="two">
+              <div><div class="label">Address</div><input id="address" class="input" value="${p.address||""}"></div>
+              <div><div class="label">City</div><input id="city" class="input" value="${p.city||""}"></div>
+            </div>
+            <div class="three">
+              <div><div class="label">Type</div>
+                <select id="type">
+                  ${["Apartment","House","Commercial","Land"].map(t => `<option ${p.type===t?"selected":""}>${t}</option>`).join("")}
+                </select>
+              </div>
+              <div><div class="label">Status</div>
+                <select id="status">
+                  ${["Active","Under Offer","Sold","Rented","Inactive"].map(s => `<option ${p.status===s?"selected":""}>${s}</option>`).join("")}
+                </select>
+              </div>
+              <div><div class="label">Floor</div><input id="floor" class="input" value="${p.floor||""}"></div>
+            </div>
+            <div class="three">
+              <div><div class="label">Bedrooms</div><input id="bedrooms" class="input" value="${p.bedrooms ?? ""}"></div>
+              <div><div class="label">Bathrooms</div><input id="bathrooms" class="input" value="${p.bathrooms ?? ""}"></div>
+              <div><div class="label">Area (m²)</div><input id="area" class="input" value="${p.area ?? ""}"></div>
+            </div>
+            <div>
+              <div class="label">Condition</div>
+              <input id="condition" class="input" value="${p.condition||""}">
+            </div>
+            <div>
+              <div class="label">Description</div>
+              <textarea id="description">${p.description||""}</textarea>
+            </div>
+
+            <div class="card" style="padding:12px; background: rgba(16,31,56,.35);">
+              <div style="font-weight:900; margin-bottom:10px;">Owner link</div>
+              <div class="label">Select owner</div>
+              <select id="ownerId">
+                <option value="">No owner</option>
+                ${ownersList.map(o => `<option value="${o.id}" ${p.ownerId===o.id?"selected":""}>${o.name} (${o.phone||"no phone"})</option>`).join("")}
+              </select>
+              <div class="muted" style="margin-top:10px; font-size:12px;">To add new owner, use Owners page.</div>
+            </div>
+
+            <button id="save" class="btn full">Save changes</button>
+            <div id="err" class="muted"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Images</h3>
+          <div class="muted" style="margin-bottom:10px;">Upload images, set cover, and edit alt text.</div>
+          <input id="img" type="file" multiple accept="image/*" class="input">
+          <button id="upload" class="btn" style="margin-top:10px;"><span class="ic">${UI.icon("upload")}</span><span>Upload</span></button>
+
+          <div style="height:12px;"></div>
+
+          ${imgs.map((im, idx) => `
+            <div class="row" style="gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.08); align-items:flex-start;">
+              <img src="${im.url}" style="width:92px; height:68px; object-fit:cover; border-radius:12px; border:1px solid rgba(255,255,255,.08);">
+              <div style="flex:1;">
+                <div class="label">Alt text</div>
+                <input class="input" data-alt="${idx}" value="${im.alt || ""}">
+                <div class="row" style="margin-top:8px; justify-content:flex-start; gap:10px;">
+                  <label style="display:flex; gap:8px; align-items:center; color:var(--muted); font-size:12px;">
+                    <input type="radio" name="cover" data-cover="${idx}" ${im.isCover?"checked":""}>
+                    Cover image
+                  </label>
+                  <div class="muted" style="font-size:12px;">Order: ${idx}</div>
+                </div>
+              </div>
+            </div>
+          `).join("") || `<div class="muted">No images uploaded.</div>`}
+        </div>
+      </div>
+
+      <div style="height:14px;"></div>
+
+      <div class="card">
+        <div class="row">
+          <h3 style="margin:0;">Sources / URLs</h3>
+          <button id="addSrc" class="btn ghost"><span class="ic">${UI.icon("plus")}</span><span>Add source</span></button>
+        </div>
+        <div id="sources" style="margin-top:10px;"></div>
+        <button id="saveSources" class="btn" style="margin-top:12px;">Save sources</button>
+        <div id="err2" class="muted"></div>
+      </div>
+    `;
+
+    // image interactions
+    UI.qsa("[data-alt]").forEach(inp => {
+      inp.addEventListener("input", (e) => {
+        const i = Number(e.target.dataset.alt);
+        p.images[i].alt = e.target.value;
+      });
+    });
+    UI.qsa("[data-cover]").forEach(radio => {
+      radio.addEventListener("change", (e) => {
+        const i = Number(e.target.dataset.cover);
+        p.images.forEach((x, k) => x.isCover = (k === i));
+      });
+    });
+
+    // sources
+    const srcEl = UI.qs("#sources");
+    const sources = (p.sources || []).map(s => ({ ...s }));
+    function renderSources(){
+      srcEl.innerHTML = sources.map((s, idx) => `
+        <div class="card" style="padding:12px; margin-top:10px;">
+          <div class="three">
+            <div><div class="label">Label</div><input class="input" data-k="label" data-i="${idx}" value="${s.label||""}"></div>
+            <div>
+              <div class="label">Type</div>
+              <select class="input" data-k="type" data-i="${idx}">
+                ${["listing","article","other"].map(t => `<option ${s.type===t?"selected":""}>${t}</option>`).join("")}
+              </select>
+            </div>
+            <div><div class="label">URL</div><input class="input" data-k="url" data-i="${idx}" value="${s.url||""}"></div>
+          </div>
+        </div>
+      `).join("") || `<div class="muted">No sources.</div>`;
+
+      UI.qsa("[data-k]").forEach(inp => {
+        inp.addEventListener("input", (e) => {
+          const i = Number(e.target.dataset.i);
+          const k = e.target.dataset.k;
+          sources[i][k] = e.target.value;
+        });
+        inp.addEventListener("change", (e) => {
+          const i = Number(e.target.dataset.i);
+          const k = e.target.dataset.k;
+          sources[i][k] = e.target.value;
+        });
+      });
+
+      UI.qs("#saveSources").onclick = async () => {
+        UI.qs("#err2").textContent = "";
+        try {
+          const body = { sources };
+          const upd = await UI.api(`/api/properties/${encodeURIComponent(p.id)}`, { method:"PUT", body: JSON.stringify(body) });
+          p.sources = upd.item.sources;
+          UI.toast("Sources saved");
+        } catch(e) {
+          UI.qs("#err2").textContent = e.message;
+        }
+      };
+    }
+
+    UI.qs("#addSrc").addEventListener("click", (e) => {
+      e.preventDefault();
+      sources.push({ label:"", type:"listing", url:"" });
+      renderSources();
+    });
+
+    renderSources();
+
+    // save details
+    UI.qs("#save").addEventListener("click", async () => {
+      UI.qs("#err").textContent = "";
+      try {
+        const body = {
+          title: UI.qs("#title").value,
+          price: UI.qs("#price").value,
+          address: UI.qs("#address").value,
+          city: UI.qs("#city").value,
+          type: UI.qs("#type").value,
+          status: UI.qs("#status").value,
+          bedrooms: UI.qs("#bedrooms").value,
+          bathrooms: UI.qs("#bathrooms").value,
+          area: UI.qs("#area").value,
+          floor: UI.qs("#floor").value,
+          condition: UI.qs("#condition").value,
+          description: UI.qs("#description").value,
+          ownerId: UI.qs("#ownerId").value,
+          images: (p.images||[]).map((im, idx) => ({ url: im.url, alt: im.alt, order: idx, isCover: !!im.isCover }))
+        };
+        const upd = await UI.api(`/api/properties/${encodeURIComponent(p.id)}`, { method:"PUT", body: JSON.stringify(body) });
+        Object.assign(p, upd.item);
+        UI.toast("Saved");
+        render();
+      } catch(e) {
+        UI.qs("#err").textContent = e.message;
+      }
+    });
+
+    // upload
+    UI.qs("#upload").addEventListener("click", async () => {
+      const input = UI.qs("#img");
+      if (!input.files || input.files.length === 0) return UI.toast("Select images first");
+      const fd = new FormData();
+      for (const f of input.files) fd.append("files", f);
+
+      try {
+        const out = await UI.apiRaw(`/api/properties/${encodeURIComponent(p.id)}/images`, { method:"POST", body: fd });
+        UI.toast("Images uploaded");
+        const fresh = await UI.api(`/api/properties/${encodeURIComponent(p.id)}`, { method:"GET" });
+        Object.assign(p, fresh.item);
+        render();
+      } catch(e) {
+        UI.toast(e.message);
+      }
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
